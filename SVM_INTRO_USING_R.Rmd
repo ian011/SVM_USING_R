@@ -1,0 +1,222 @@
+---
+title: "Support Vector Machines"
+author: "Ian_Muchi[R]i"
+date: "9/2/2020"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## R Markdown
+Support vectoe machines (SVM) are binary classifiers. For more than two (binary) classes, classification is achieved by running binary classification multiple times creatively. The advantage of SVM is that they can perform non linear classification therefore making them more flexible.
+
+Classification methodology:
+First step is performed via Kernel functions. These are equations that project the dataset (whose elements are to be classified) into a new feature space. In the new space,previosly non linear observations become linearly separable.
+
+Classification is then achieved using a hyperplane that separates the various classes.
+Therefore,an SVM is trained by looking for the optimal hyperplane that will separate the two classes. The optimal hyperplane by definition, is the plane that maximizes the margins between the closest points of the two classes. The points that lie on the margin are called the suporting vectors and the line passing via the midpoint of the margins is the optimal hyperplane.
+
+For this session, we are going to be using the packages tidyverse and e071.If you don't have the packages installed already just run the commands below:
+
+```{r}
+#suppressMessages(install.packages("tidyverse")) #installs the packages
+suppressMessages(library(tidyverse)) #loads the installed package
+#suppressMessages(install.packages("e071"))
+suppressMessages(library(e1071))
+
+
+```
+
+After loading the necessary packages, we load the dataset which we'll be using in the session
+
+```{r}
+#LOAD THE DATASET INTO OUR IDE
+tree_data <-read.csv("E:/datasets/trees.csv")
+#str(tree_data)
+#we check to see what is contained in the dataset
+view(tree_data)
+
+```
+from the result we see that the data has four features and the data has three classification categories 0,1 and 2 (under tree type column)
+The features are:
+    leaf_width
+    leaf_length
+    trunk_girth
+    trunk_height
+Features are basically the characteristics we use to classify the type of a tree.
+
+To get a better understanding of our dataset, lets visualize it using the package ggplot. We look at the leaf features and trunk features separately using scatter plots, and colour the points based on the label tree_type.
+
+```{r}
+# Plot of leaf features, where `x = leaf_width` and `y = leaf_length`
+tree_data %>% ggplot(aes(x = leaf_width, y = leaf_length,color = as.factor(tree_type)))+geom_point()+ ggtitle("Leaf length against. leaf width coloured by tree type")+ labs(x = "Leaf width", y = "Leaf length", colour = "Tree type") +
+theme(plot.title = element_text(hjust = 0.5))
+
+```
+from the plot, we see that based on leaf width and leaf length, there are three groups present in this dataset divided according to tree type.
+Similarly, using the trunks features we get the plot below.
+```{r}
+# Plot of trunk features, where `x = trunk girth` and `y = trunk height`
+tree_data %>% ggplot(aes(x = trunk_girth, y = trunk_height,color = as.factor(tree_type)))+geom_point()+ ggtitle("trunk height against. trunk girth coloured by tree type")+ labs(x = "trunk girth", y = "trunk_height", colour = "Tree type") +
+theme(plot.title = element_text(hjust = 0.5))
+```
+Similarly,based on the features trunk girth and trunk height, again we can see three groups that separate based on tree_type: 0, 1, and 2 (coloured red, green, and blue, respectively). 
+There are some Extraneous elements, but for the most part, the features trunk girth and trunk height allow you to predict tree type.
+
+TRAINING GOAL/OBJECTIVE
+
+Suppose we have a new tree specimen and we want to figure out the tree type based on its leaf and trunk measurements. We could create boundary lines separating the 3 classes on the plots we just made and based on the region tree data points lie in the two scatter plots, we approximate the tree type . 
+
+Alternatively, using these same leaf and trunk measurements, SVMs can predict the tree type for us. SVMs will use the features and labels we provide for known tree types to create hyperplanes for tree type. These hyperplanes allow us to predict which tree type a new tree specimen belongs to, given their leaf and trunk measurements.
+
+IMPLEMENTATION
+
+Lets begin with binary classification. We create one SVMs based on leaf features and the other svm can be implemented in a similar fashion using trunk features.
+
+The svm function is found in the package e1071. To see it's input arguments structure and syntax, we use the package documentation as shown below
+```{r}
+ ?svm
+```
+For this session, we use the syntax:
+                  svm(X = x, y = y, data = dataset)
+
+
+where x represents the features (of class matrix), and y represents the labels (of class factor).
+
+It is vital to note that the svm function requires two types of data structures, a matrix and a factor. 
+
+A factor is used to categorize data, where the names of the categories are known as levels. For example, "air" could be a factor, with levels including "oxygen", "nitrogen", and "carbon dioxide"
+
+to check the type of elements in the dataset we run the code
+
+```{r}
+str(tree_data)
+#we notice that tree type values are integers
+#the data is stored in a data frame
+```
+
+
+The SVM will be based on the leaf features i.e leaf_width and leaf_length. We will need to create a new variable that contains only these two features, then convert it from a data.frame to a matrix, so it can be the input to the x argument in the svm function. 
+
+We also need to convert the labels tree_type into a factor for the input to the y variable of the svm function, as it is currently stored as an integer.
+
+Conversion to appropriate data type of the x and y variables for the leaf features in tree_data is done as shown below.
+
+```{r}
+#create a subset from the original dataset excluding the trunk features and conerting it to a matrix
+
+x_leaf_data <- tree_data %>% select(leaf_width,leaf_length) %>% as.matrix()
+
+#confirmation of the class
+class(x_leaf_data)
+
+#view the new subset wee just created
+head(x_leaf_data)
+
+#Convert the tree type from integer to factor
+tree_data <- tree_data %>% mutate(tree_type = as.factor(tree_type))
+
+#Confirmation of our y variable input to svm
+
+class(tree_data$tree_type)
+
+head(tree_data$tree_type)
+
+```
+Finally we are now ready to run the function svm based on the leaf features stored in the new variable x_leaf_data, and the label saved in the variable tree_data$tree_type.
+
+```{r}
+svm_leaf_data <- svm(x = x_leaf_data, y = tree_data$tree_type, type = "C-classification", kernel = "radial")
+
+print("Our SVM model dubbed svm_leaf_data is ready.")
+```
+ 
+At the begining, i mentioned something to do with hyperplanes, to help illustrate the hyperplane, we will create a fine grid of data points within the feature space to represent different combinations of leaf width and leaf length, and colour the new data points based on the predictions of our SVM
+
+```{r}
+# Create a fine grid of the feature space
+leaf_width <- seq(from = min(tree_data$leaf_width), to = max(tree_data$leaf_width), length = 100) #creates an array(100 elements) leafwidthvalues from min to max value
+
+
+leaf_length <- seq(from = min(tree_data$leaf_length), to = max(tree_data$leaf_length), length = 100)
+
+fine_grid_leaf <- as.data.frame(expand.grid(leaf_width, leaf_length)) #create a dataframe with columns leaf_width, leaf_length
+
+
+fine_grid_leaf <- fine_grid_leaf %>%
+                  dplyr::rename(leaf_width = "Var1", leaf_length = "Var2")
+# Check output
+view(fine_grid_leaf)
+
+# For every new point in `fine_grid_leaf`, predict its tree type based on the SVM `svm_leaf_data`
+
+fine_grid_leaf$tree_pred <- predict(svm_leaf_data, newdata = fine_grid_leaf, type = "decision")
+
+# Check output
+head(fine_grid_leaf)
+table(fine_grid_leaf$tree_pred) #gives entries per prediction
+```
+Now we can create a scatter plot that contains the new fine grid of points we created above, and also the original tree data to see which group the different trees fall into based on the SVM svm_leaf_data
+
+```{r}
+# Create scatter plot  with original leaf features layered over the fine grid of data points(i.e values predicted in the feature space)
+
+ggplot() +
+geom_point(data = fine_grid_leaf, aes(x = leaf_width, y = leaf_length, colour = tree_pred), alpha = 0.25) + #plotting the predicted values
+stat_contour(data = fine_grid_leaf, aes(x = leaf_width, y = leaf_length, z = as.integer(tree_pred)),
+             lineend = "round", linejoin = "round", linemitre = 1, size = 0.25, colour = "black") + #plots the boundaries (hyperplane)
+geom_point(data = tree_data, aes(x = leaf_width, y = leaf_length, colour = tree_type, shape = tree_type)) +
+ggtitle("SVM decision boundaries for leaf length vs. leaf width") +
+labs(x = "Leaf width", y = "Leaf length", colour = "Actual tree type", shape = "Actual tree type" ) +#plots actual classification value
+theme(plot.title = element_text(hjust = 0.5))
+```
+From the graph the three faintly coloured zones are the SVM's classification predictions based on the leaf features. The hyperplane is represented by the thick black boundary lines.
+
+
+We can use these coloured zones and hyperplanes to observe which tree type the SVM has chosen to place our original data points into. 
+In the graph above, our original data points are represented by both colour and shape.
+
+Also remember, that the tree type of the fine grid of data points is based on the SVM model where we used leaf features as input to the SVM.
+
+inferring to the graph above, we observe two different classification scenarios:
+
+1)Our original data points are classified correctly by the SVM, as the data point falls into the zone of the same colour, e.g. a green triangle data point (type 1 tree) falls into the green zone (the SVM predicted the tree as type 1).
+
+Our original data points are misclassified by the SVM, as the data point falls into the zone of a different colour, e.g. a red circle data point ( type 0 tree) falls into the green zone (the SVM predicted the tree as type 1).
+
+However, we cannot tell precisely if our classification is accurate. To test the level of accuracy, we need to determine the mis-classification rate.
+To do this, we will need to run the predict function again, but this time using our original data points as input for comparison. Therefore we use the original dataset,tree_data as our test set.
+
+```{r}
+pred_leaf_data <- tree_data %>% select(leaf_width, leaf_length)
+
+# Predict the tree type of our original data based on the SVM `svm_leaf_data`
+pred_leaf_data$tree_pred <- predict(svm_leaf_data, newdata = pred_leaf_data, type = "decision")
+
+# Check output
+head(pred_leaf_data)
+
+# Add tree_data$tree_type to pred_leaf_data
+pred_leaf_data <- inner_join(pred_leaf_data, tree_data, by = c("leaf_width", "leaf_length")) %>%
+select(-trunk_girth, -trunk_height)
+
+# Check output
+head(pred_leaf_data)
+
+
+
+# Create a table of predictions to show mis-classification rate
+table(pred_leaf_data$tree_pred, pred_leaf_data$tree_type)
+
+# Mis-classification rate: proportion of misclassifiedb observations
+mean(pred_leaf_data$tree_pred != pred_leaf_data$tree_type)
+```
+Thus we get a misclassification rate of about 6.5%. which can actually preferable to a mis-classification rate of 0%, as the latter might indicate that the model has overfit the training data.
+
+TASK
+
+create a second SVM based on the trunk  using a procedure similar to that we've used in the discussion.
+
+
